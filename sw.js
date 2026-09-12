@@ -17,7 +17,7 @@
 // changing this string is what actually evicts the bad copy from devices
 // already carrying it. Bump it on any deploy that fixes a page-breaking
 // bug — a fix nobody can receive is not shipped.
-const CACHE_NAME = 'ozylix-pwa-v29';
+const CACHE_NAME = 'ozylix-pwa-v30';
 const OFFLINE_URL = '/offline.html';
 
 // Files to cache on install (your core pages)
@@ -76,7 +76,7 @@ self.addEventListener('activate', event => {
     caches.keys().then(keys =>
       Promise.all(
         keys
-          .filter(key => key !== CACHE_NAME)
+          .filter(key => key.startsWith('ozylix-pwa-') && key !== CACHE_NAME)
           .map(key => {
             console.log('[Ozylix SW] Deleting old cache:', key);
             return caches.delete(key);
@@ -84,7 +84,7 @@ self.addEventListener('activate', event => {
       )
     )
   );
-  self.clients.claim();
+  event.waitUntil(self.clients.claim());
 });
 
 // ── FETCH ────────────────────────────────────────────────────────────
@@ -123,6 +123,21 @@ self.addEventListener('fetch', event => {
   // the static asset cache.
   if (url.pathname.startsWith('/api/')) return;
 
+  // Sensitive pages and authenticated requests never enter offline storage.
+  // Public product images have their own edge cache; avoid duplicating large
+  // video/image bodies in the device's application cache.
+  const privatePath = /^\/(?:account|orders|checkout|thankyou|login|admin(?:\.html)?|ops-console-8f3d2c\.html)(?:\/|$)/.test(url.pathname);
+  if (privatePath || request.headers.has('Authorization') || url.pathname.startsWith('/cdn-storage/')) return;
+
+  const canStore = response => response && response.status === 200 &&
+    !/(?:no-store|private)/i.test(response.headers.get('Cache-Control') || '') &&
+    !response.headers.has('Set-Cookie');
+  const remember = response => {
+    if (!canStore(response)) return;
+    const clone = response.clone();
+    event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(request, clone)).catch(() => {}));
+  };
+
   const isDocument = request.mode === 'navigate' || request.destination === 'document';
 
   // Rule 2a — documents: network first, cache as backup.
@@ -130,10 +145,7 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       fetch(request)
         .then(response => {
-          if (response && response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
-          }
+          remember(response);
           return response;
         })
         .catch(async () => {
@@ -151,13 +163,11 @@ self.addEventListener('fetch', event => {
     caches.match(request).then(cached => {
       const network = fetch(request)
         .then(response => {
-          if (response && response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
-          }
+          remember(response);
           return response;
         })
         .catch(() => cached || Response.error());
+      event.waitUntil(network.then(() => {}).catch(() => {}));
       return cached || network;
     })
   );
@@ -191,5 +201,10 @@ self.addEventListener('push', event => {
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  event.waitUntil(clients.openWindow(event.notification.data.url));
+  let target;
+  try {
+    target = new URL(event.notification.data?.url || '/', self.location.origin);
+    if (target.origin !== self.location.origin || target.protocol !== 'https:') throw new Error('external');
+  } catch { target = new URL('/', self.location.origin); }
+  event.waitUntil(clients.openWindow(target.href));
 });
