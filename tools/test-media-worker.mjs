@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import { handleCdnRequest, toSupabaseUrl } from '../worker/image-cdn.js';
+import { isSpaPath } from '../worker/index.js';
+const request = (path='/cdn-storage/product-images/a.webp',opts={}) => new Request('https://www.ozylix.com'+path,opts);
+const writes=[]; const tasks=[];
+globalThis.caches={default:{match:async()=>undefined,put:async(k,r)=>writes.push([k.url,await r.text()])}};
+const ctx={waitUntil(p){tasks.push(p);}};
+for(const path of ['/else/product-images/a','/cdn-storage/private/a','/cdn-storage/product-images/../a','/cdn-storage/product-images/%2e%2e/a','/cdn-storage/product-images/a%2fb','/cdn-storage/product-images/%252e%252e/a','/cdn-storage/product-images/%zz']) assert.equal(toSupabaseUrl(path),null,path);
+assert.match(toSupabaseUrl('/cdn-storage/product-images/folder/a%20b.webp'),/folder\/a%20b.webp$/);
+assert.equal(isSpaPath('/blog/post'),true); assert.equal(isSpaPath('/blogger'),false);
+globalThis.fetch=async()=>{throw Error('must not fetch');};
+assert.equal((await handleCdnRequest(request(undefined,{method:'POST'}),ctx)).status,405);
+globalThis.fetch=async()=>new Response('<script>bad</script>',{headers:{'Content-Type':'text/html'}});
+assert.equal((await handleCdnRequest(request(),ctx)).status,415); assert.equal(writes.length,0);
+let controller;
+globalThis.fetch=async(url,opts)=>{
+  assert.equal(typeof opts.cf.cacheKey,'string');
+  return new Response(new ReadableStream({start(c){controller=c;}}),{headers:{'Content-Type':'image/webp'}});
+};
+// Headers must resolve before the origin finishes producing the body.
+const streamed=await handleCdnRequest(request(),ctx);
+assert.equal(streamed.status,200); assert.equal(streamed.headers.get('X-Content-Type-Options'),'nosniff');
+controller.enqueue(new TextEncoder().encode('image')); controller.close();
+assert.equal(await streamed.text(),'image'); await Promise.all(tasks); assert.equal(writes.length,1);
+globalThis.fetch=async(url,opts)=>{assert.equal(opts.headers.Range,'bytes=0-2');return new Response('vid',{status:206,headers:{'Content-Type':'video/mp4','Content-Range':'bytes 0-2/10'}});};
+const ranged=await handleCdnRequest(request('/cdn-storage/product-images/a.mp4',{headers:{Range:'bytes=0-2'}}),ctx);
+assert.equal(ranged.status,206); assert.equal(ranged.headers.get('Content-Range'),'bytes 0-2/10'); assert.equal(writes.length,1);
+globalThis.fetch=async()=>new Response(null,{headers:{'Content-Type':'image/webp','Content-Length':'42'}});
+const head=await handleCdnRequest(request(undefined,{method:'HEAD'}),ctx); assert.equal(head.body,null); assert.equal(head.headers.get('Content-Length'),'42');
+globalThis.fetch=async()=>new Response('<svg/>',{headers:{'Content-Type':'image/svg+xml'}});
+const svg=await handleCdnRequest(request('/cdn-storage/product-images/a.svg'),ctx); assert.match(svg.headers.get('Content-Security-Policy'),/sandbox/); await svg.text(); await Promise.all(tasks);
+globalThis.fetch=async()=>{throw Error('timeout');};
+assert.equal((await handleCdnRequest(request(),ctx)).status,502);
+globalThis.caches.default.match=async()=>new Response('cached',{headers:{'Content-Type':'image/webp'}});
+assert.equal(await (await handleCdnRequest(request(),ctx)).text(),'cached');
+console.log('Media worker: traversal, MIME, streaming, cache lifecycle, ranges, HEAD, SVG isolation, errors, cache hit and routes passed');
