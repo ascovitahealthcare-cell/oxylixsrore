@@ -181,12 +181,22 @@ function mergeBackendProducts(backendProducts) {
   const parseArr = (val) => {
     if (!val) return [];
     if (Array.isArray(val)) return val;
-    if (typeof val === 'string') { try { return JSON.parse(val); } catch(e) { return val.split(',').map(s=>s.trim()).filter(Boolean); } }
+    if (typeof val === 'string') { try { const parsed = JSON.parse(val); return Array.isArray(parsed) ? parsed : []; } catch(e) { return val.split(',').map(s=>s.trim()).filter(Boolean); } }
     return [];
   };
 
   backendProducts.forEach(bp => {
     bp.id = parseInt(bp.id);
+    const normalizeMedia = items => items.map(item => {
+      const url = typeof item === 'string' ? item : item && item.url;
+      if (typeof url !== 'string' || !url.trim()) return null;
+      return { ...(typeof item === 'object' ? item : {}), url: url.trim(),
+        type: item.type === 'video' ? 'video' : mediaTypeFromUrl(url),
+        thumb: typeof item.thumb === 'string' ? item.thumb : url.trim() };
+    }).filter(Boolean).slice(0, 10);
+    let backendMedia = normalizeMedia(parseArr(bp.media));
+    if (!backendMedia.length) backendMedia = normalizeMedia(parseArr(bp.images));
+    if (!backendMedia.length) backendMedia = normalizeMedia([bp.image, bp.image2, bp.image3, bp.image4, bp.image5].filter(Boolean));
 
     const idx = PRODUCTS.findIndex(p => p.id === bp.id);
 
@@ -219,22 +229,12 @@ function mergeBackendProducts(backendProducts) {
       else if (bp.position != null) p.position = parseInt(bp.position);
       // Tags
       if (bp.tags) p.tags = parseArr(bp.tags);
-      // Media — support media[] JSON array (up to 10 images/videos) OR individual fields
-      // ✅ Only apply backend images if products-images.js has NOT already set them
-      const alreadyHasImage = p.image && p.image.startsWith('http');
-      const mediaArr = parseArr(bp.media || bp.images);
-      if (mediaArr.length && !alreadyHasImage) {
-        p.media = mediaArr.slice(0, 10); // [{url, type:"image"|"video", thumb}]
-        // Back-compat flat fields
-        p.image  = (mediaArr[0] && mediaArr[0].url) || mediaArr[0] || p.image;
-        p.image2 = (mediaArr[1] && mediaArr[1].url) || mediaArr[1] || '';
-        p.allImages = mediaArr.map(m => m.url || m).filter(Boolean);
-      } else {
-        if (bp.image  && !alreadyHasImage) p.image  = bp.image;
-        if (bp.image2 && !alreadyHasImage) p.image2 = bp.image2;
-        // Build media array from individual fields for back-compat
-        const legacyUrls = [bp.image,bp.image2,bp.image3,bp.image4,bp.image5].filter(Boolean);
-        if (legacyUrls.length) p.media = legacyUrls.map(u=>({url:u,type:mediaTypeFromUrl(u),thumb:u}));
+      // Backend media is authoritative so admin edits replace stale local images.
+      if (backendMedia.length) {
+        p.media = backendMedia;
+        p.image = backendMedia[0].url;
+        p.image2 = backendMedia[1]?.url || '';
+        p.allImages = backendMedia.map(m => m.url);
       }
       // Key Ingredients
       const ki = parseArr(bp.key_ingredients);
@@ -263,7 +263,7 @@ function mergeBackendProducts(backendProducts) {
       }
     } else if (bp.active !== false) {
       // New product from admin — add to store
-      const imgs = parseArr(bp.images);
+      const imgs = backendMedia.map(m => m.url);
       const ki   = parseArr(bp.key_ingredients);
       PRODUCTS.push({
         id:          parseInt(bp.id),
@@ -276,7 +276,7 @@ function mergeBackendProducts(backendProducts) {
         price:       bp.price != null ? parseFloat(bp.price) : null,
         salePrice:   bp.sale_price ? parseFloat(bp.sale_price) : null,
         offer:       bp.offer_text || bp.offer || null,
-        media:       (()=>{ const m=parseArr(bp.media||bp.images); return m.length?m.slice(0,10).map(x=>typeof x==='string'?{url:x,type:mediaTypeFromUrl(x),thumb:x}:x):[]; })(),
+        media:       backendMedia,
         image:       imgs[0] || bp.image || '',
         image2:      imgs[1] || bp.image2 || '',
         allImages:   imgs,
@@ -1387,7 +1387,7 @@ function cdnImg(url) {
   // Any public Supabase storage URL: /storage/v1/object/public/<bucket>/<name>[?params]
   // → /cdn-storage/<bucket>/<name>[?params] so the Worker serves and caches it
   // at the edge (product images, website uploads, banners, fallbacks…).
-  const m = s.match(/^https?:\/\/[^/]+\/storage\/v1\/object\/public\/([^"'?\s]+)(\?.*)?$/);
+  const m = s.match(/^https:\/\/frwsjgrrtzhjfflcdjjs\.supabase\.co\/storage\/v1\/object\/public\/([^"'?\s]+)(\?.*)?$/);
   if (m) {
     // Preserve any transformation params in the cache key so ?width=300
     // requests don't collide with full-size ones.
@@ -1408,7 +1408,7 @@ function mediaTypeFromUrl(url) {
   return 'image';
 }
 function getProductImg(p) {
-  if (p.image && p.image.startsWith('http')) return cdnImg(p.image);
+  if (typeof p.image === 'string' && /^(https?:\/\/|\/(?!\/))/.test(p.image)) return cdnImg(p.image);
   return cdnImg(PRODUCT_FALLBACKS[p.category] || PRODUCT_FALLBACKS['default']);
 }
 
@@ -1421,7 +1421,7 @@ function getProductSurfaceImg(p) {
   return getProductImg(p);
 }
 function productSurfaceMediaHTML(url, alt, className, extraStyle) {
-  const src = cdnImg(url || '');
+  const src = esc(cdnImg(url || ''));
   const safeAlt = esc(alt || 'Ozylix product media');
   const cls = className || '';
   const style = extraStyle || '';

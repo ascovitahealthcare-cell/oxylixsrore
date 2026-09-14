@@ -8,7 +8,7 @@
   "scripts/invoice-renderer.js": "51aaf2cafb17d22b",
   "scripts/ozy-track.js": "3c8c65198a09d3f0",
   "scripts/seo-core.js": "6abfa9cf67e18fad",
-  "scripts/store-core.js": "9e24fd60ecbf7e23",
+  "scripts/store-core.js": "c4c992ab618af0dd",
   "scripts/theme-builder.js": "d575eedb431da870",
   "styles/admin-main.css": "063bf10f95877ca6",
   "styles/admin-palettes.css": "605130aa31169755",

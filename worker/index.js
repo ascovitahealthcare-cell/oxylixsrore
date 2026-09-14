@@ -66,7 +66,7 @@ function isSpaPath(pathname) {
   if (PRODUCT_PATH.test(path)) return true;
   // Wildcard entries like '/blog/*' match any path sharing that prefix.
   for (const route of SPA_ROUTES) {
-    if (route.endsWith('/*') && path.startsWith(route.slice(0, -2)) && path.length > route.length - 2) {
+    if (route.endsWith('/*') && path.startsWith(route.slice(0, -1)) && path.length > route.length - 2) {
       return true;
     }
   }
@@ -181,11 +181,12 @@ async function handleSiteMedia() {
   try {
     const r = await fetch(SITE_MEDIA_URL, {
       headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(10000),
       cf: {
         // Deterministic key in the zone cache so every visitor shares one
         // entry, and cf cacheTtl applies even though the origin (Render) is
         // not itself behind Cloudflare.
-        cacheKey: SITE_MEDIA_CACHE_KEY,
+        cacheKey: SITE_MEDIA_CACHE_KEY.url,
         cacheTtl: SITE_MEDIA_EDGE_TTL,
         cacheEverything: true,
       },
@@ -233,7 +234,7 @@ const APEX_HOST = 'ozylix.com';
 const CANONICAL_HOST = 'www.ozylix.com';
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     // Enforce transport security at the Worker edge. HSTS only protects
@@ -280,7 +281,7 @@ export default {
     // costs Supabase egress only on the very first request. Real files
     // (favicon, logo etc.) still serve from disk; see worker/image-cdn.js.
     if (isCdnRequest(url.pathname)) {
-      return handleCdnRequest(request);
+      return handleCdnRequest(request, ctx);
     }
 
     if (url.hostname.toLowerCase() === ADMIN_HOST) {
