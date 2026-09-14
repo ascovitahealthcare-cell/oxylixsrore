@@ -50,7 +50,7 @@ const CORE_FILES = [
   '/scripts/seo-core.min.js?v=20260825-1',
   '/scripts/shop.js',
   '/scripts/promo-data.js',
-  '/scripts/store-core.min.js?v=20260825-2',
+  '/scripts/store-core.min.js?v=20260914-1',
   '/scripts/auth-core.min.js?v=20260825-2',
   '/scripts/cart-utils.js'
 ];
