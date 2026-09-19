@@ -3940,63 +3940,8 @@ async function finalizeOrder(orderId, formData, total, method, codCharge, paymen
   const firstName = nameParts[0] || formData.firstName;
   const lastName  = nameParts.slice(1).join(' ') || '.';
 
-  // ── 1. Push to Shiprocket ──────────────────────────────────
   let srOrderId = null, srShipmentId = null, srAwb = null;
   let srStatus = 'Confirmed — Awaiting Dispatch';
-  if (method !== 'demo') {
-    try {
-      const srResp = await fetch(SHIPROCKET_CONFIG.apiBase + '/api/create-shiprocket-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(20000),
-        body: JSON.stringify({
-          order_id: orderId,
-          order_date: new Date().toISOString().slice(0,19).replace('T',' '),
-          pickup_location: SHIPROCKET_CONFIG.pickup_location,
-          billing_customer_name: firstName, billing_last_name: lastName,
-          billing_address: formData.addr1, billing_address_2: formData.addr2 || '',
-          billing_city: formData.city, billing_pincode: formData.pin,
-          billing_state: formData.state, billing_country: 'India',
-          billing_email: formData.email, billing_phone: formData.phone,
-          shipping_is_billing: true, order_items: srItems,
-          payment_method: method === 'cod' ? 'COD' : 'Prepaid', sub_total: total,
-          length: 15, breadth: 10, height: 10,
-          weight: Math.max(0.2, srItems.reduce((s,i)=>s+i.units*0.1,0)),
-        }),
-      });
-      const srData = await srResp.json();
-      if (srResp.ok && srData.order_id) {
-        srOrderId = srData.order_id; srShipmentId = srData.shipment_id; srAwb = srData.awb_code || null;
-        srStatus = 'Pushed to Shiprocket — Ready to Ship 🚚';
-        const trackBtn = document.getElementById('trackOrderBtn');
-        if (trackBtn) { trackBtn.href = srAwb ? 'https://shiprocket.co/tracking/'+srAwb : 'https://shiprocket.in/shipment-tracking/'; trackBtn.style.display='inline-flex'; }
-        const srIdEl = document.getElementById('srOrderId');
-        if (srIdEl) { srIdEl.textContent = srOrderId; const row=document.getElementById('srOrderRow'); if(row) row.style.display='flex'; }
-      } else {
-        // Log the actual error from Shiprocket so we can debug
-        console.error('❌ Shiprocket error:', JSON.stringify(srData));
-        srStatus = 'Order Confirmed — Dispatch Pending (SR: ' + (srData.error || srData.message || 'error') + ')';
-      }
-    } catch(e) { console.error('❌ Shiprocket fetch failed:', e.message); }
-  } else {
-    srStatus = '';
-  }
-
-  // ── 2. Save order locally ──────────────────────────────────
-  try {
-    const orders = JSON.parse(localStorage.getItem('asc_orders') || '[]');
-    orders.push({
-      orderId, srOrderId, srShipmentId, srAwb,
-      date: new Date().toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'numeric'}),
-      customer: `${formData.firstName} ${formData.lastName}`,
-      email: formData.email, phone: formData.phone,
-      userEmail: (getCurrentUser()?.email || formData.email || '').toLowerCase().trim(),
-      address: `${formData.addr1}, ${formData.city}, ${formData.state} - ${formData.pin}`,
-      total, method, items: srItems.map(i=>({name:i.name,qty:i.units,price:i.selling_price})),
-      status: srStatus,
-    });
-    localStorage.setItem('asc_orders', JSON.stringify(orders));
-  } catch(e) {}
 
   // How many VitaPoints the customer chose to redeem. The actual debit
   // happens SERVER-SIDE (vita_redeem, atomic and idempotent per order id)
@@ -4148,6 +4093,51 @@ async function finalizeOrder(orderId, formData, total, method, codCharge, paymen
     }
     return;
   }
+
+  // Only dispatch after verified server-side order confirmation.
+  // ── Push to Shiprocket ──────────────────────────────────
+  if (method !== 'demo') {
+    try {
+      const srResp = await fetch(SHIPROCKET_CONFIG.apiBase + '/api/create-shiprocket-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('asc_jwt') || '') },
+        signal: AbortSignal.timeout(20000),
+        body: JSON.stringify({ order_id: orderId }),
+      });
+      const srData = await srResp.json();
+      if (srResp.ok && srData.order_id) {
+        srOrderId = srData.order_id; srShipmentId = srData.shipment_id; srAwb = srData.awb_code || null;
+        srStatus = 'Pushed to Shiprocket — Ready to Ship 🚚';
+        const trackBtn = document.getElementById('trackOrderBtn');
+        if (trackBtn) { trackBtn.href = srAwb ? 'https://shiprocket.co/tracking/'+srAwb : 'https://shiprocket.in/shipment-tracking/'; trackBtn.style.display='inline-flex'; }
+        const srIdEl = document.getElementById('srOrderId');
+        if (srIdEl) { srIdEl.textContent = srOrderId; const row=document.getElementById('srOrderRow'); if(row) row.style.display='flex'; }
+      } else {
+        // Log the actual error from Shiprocket so we can debug
+        console.error('❌ Shiprocket error:', JSON.stringify(srData));
+        srStatus = 'Order Confirmed — Dispatch Pending';
+      }
+    } catch(e) { console.error('❌ Shiprocket fetch failed:', e.message); }
+  } else {
+    srStatus = '';
+  }
+
+  // ── 2. Save order locally ──────────────────────────────────
+  try {
+    const orders = JSON.parse(localStorage.getItem('asc_orders') || '[]');
+    orders.push({
+      orderId, srOrderId, srShipmentId, srAwb,
+      date: new Date().toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'numeric'}),
+      customer: `${formData.firstName} ${formData.lastName}`,
+      email: formData.email, phone: formData.phone,
+      userEmail: (getCurrentUser()?.email || formData.email || '').toLowerCase().trim(),
+      address: `${formData.addr1}, ${formData.city}, ${formData.state} - ${formData.pin}`,
+      total, method, items: srItems.map(i=>({name:i.name,qty:i.units,price:i.selling_price})),
+      status: srStatus,
+    });
+    localStorage.setItem('asc_orders', JSON.stringify(orders));
+  } catch(e) {}
+
 
   // Order is confirmed in the database. The server has already awarded
   // VitaPoints into the ledger and debited any redemption — pull the real
