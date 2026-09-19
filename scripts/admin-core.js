@@ -3747,14 +3747,15 @@ function renderAllImgSlots() {
   for (let s = 1; s <= 5; s++) renderImgSlot(s);
 }
 
-// Edge image CDN mirror of the storefront's cdnImg() — admin previews of
-// uploaded images (slots, photo library, banners, promo cards) are served
-// from the Cloudflare cache so previews never count against Supabase egress.
+// Admin previews use the saved public storage URL directly. The storefront's
+// edge cache is independent and must not gate media management.
 function adminCdnImg(url) {
   if (!url) return url;
-  const s = String(url);
-  const m = s.match(/^https?:\/\/[^/]+\/storage\/v1\/object\/public\/([^"'\s]+)(\?.*)?$/);
-  if (m) return '/cdn-storage/' + m[1] + (m[2] || '');
+  const s = String(url).trim();
+  // Older saved values may already contain the same-origin proxy prefix.
+  if (s.startsWith('/cdn-storage/product-images/')) {
+    return 'https://frwsjgrrtzhjfflcdjjs.supabase.co/storage/v1/object/public/' + s.slice('/cdn-storage/'.length);
+  }
   return s;
 }
 
@@ -8773,4 +8774,5 @@ async function geminiSend() {
     console.error('Gemini error:', e);
   }
 }
+
 
