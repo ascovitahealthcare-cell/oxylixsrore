@@ -72,7 +72,10 @@ export async function handleCdnRequest(request, ctx) {
     origin = await fetch(supabaseUrl, {
       method: request.method,
       headers: range ? { Range: range, ...(request.headers.has('If-Range') ? { 'If-Range': request.headers.get('If-Range') } : {}) } : {},
-      redirect: 'error',
+      // Supabase may issue an edge redirect depending on the serving POP.
+      // Following it is safe because the destination remains controlled by
+      // Supabase Storage; rejecting it turns valid media into a Worker 502.
+      redirect: 'follow',
       signal: controller.signal,
       cf: range || request.method === 'HEAD'
         ? { cacheTtl: 0, cacheEverything: false }
