@@ -1341,24 +1341,9 @@ function showToast(msg,type=''){
   t._hideT = setTimeout(()=>{ t.classList.remove('show');
     t._killT = setTimeout(()=>t.remove(),350); },3200);
 }
-// Category-based fallback images using Wix product images already in the page
-// A neutral "no image available" placeholder — used ONLY when a product
-// truly has no image. This intentionally does NOT show any other
-// product's real photo (that was the old bug: every image-less product
-// silently displayed the Glutathione photo, making it look like a mix-up
-// between products). If you'd rather show a category icon, add per-category
-// URLs back into this object — just don't reuse a specific product's photo.
-const NO_IMAGE_PLACEHOLDER = 'data:image/svg+xml;utf8,' + encodeURIComponent(
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">' +
-  '<rect width="240" height="240" fill="#FBF3E8"/>' +
-  '<g fill="#547177" opacity=".22">' +
-  '<circle cx="104" cy="96" r="17"/>' +
-  '<circle cx="142" cy="112" r="19"/>' +
-  '<circle cx="108" cy="136" r="14"/>' +
-  '</g>' +
-  '<text x="120" y="192" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" letter-spacing="1.6" fill="#7A82A4">IMAGE COMING SOON</text>' +
-  '</svg>'
-);
+// No cross-product or third-party fallback is allowed. A missing image stays
+// blank so a visitor never sees an unrelated or unverified product photo.
+const NO_IMAGE_PLACEHOLDER = '';
 const PRODUCT_FALLBACKS = {
   'effervescent': NO_IMAGE_PLACEHOLDER,
   'spirulina':    NO_IMAGE_PLACEHOLDER,
@@ -1428,7 +1413,7 @@ function productSurfaceMediaHTML(url, alt, className, extraStyle) {
   if (mediaTypeFromUrl(src) === 'video') {
     return '<video class="' + cls + '" src="' + src + '" muted loop playsinline autoplay preload="metadata" aria-label="' + safeAlt + '" style="' + style + '"></video>';
   }
-  return '<img class="' + cls + '" src="' + src + '" alt="' + safeAlt + '" loading="lazy" fetchpriority="low" decoding="async" style="' + style + '" onerror="this.src=\'' + PRODUCT_FALLBACKS.default + '\'">';
+  return '<img class="' + cls + '" src="' + src + '" alt="' + safeAlt + '" loading="lazy" fetchpriority="low" decoding="async" style="' + style + '" onerror="this.remove()">';
 }
 function upgradeUploadedVideoImages(root) {
   const scope = root || document;

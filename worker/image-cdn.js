@@ -12,7 +12,8 @@ export function isCdnRequest(pathname) {
 export function toSupabaseUrl(pathname) {
   if (!isCdnRequest(pathname)) return null;
   const parts = pathname.slice(CDN_PREFIX.length).split('/');
-  if (!CDN_BUCKETS.has(parts.shift()) || !parts.length) return null;
+  const bucket = parts.shift();
+  if (!CDN_BUCKETS.has(bucket) || !parts.length) return null;
   // Decode each segment once, reject encoded separators and nested escapes,
   // then encode again so the origin cannot interpret it as a query or traversal.
   try {
@@ -21,7 +22,7 @@ export function toSupabaseUrl(pathname) {
       if (!decoded || decoded === '.' || decoded === '..' || /[\/\\%\x00-\x1f\x7f]/.test(decoded)) throw new Error('path');
       return encodeURIComponent(decoded);
     });
-    return `${SUPABASE_STORAGE_ORIGIN}/storage/v1/object/public/product-images/${safe.join('/')}`;
+    return `${SUPABASE_STORAGE_ORIGIN}/storage/v1/object/public/${bucket}/${safe.join('/')}`;
   } catch { return null; }
 }
 
