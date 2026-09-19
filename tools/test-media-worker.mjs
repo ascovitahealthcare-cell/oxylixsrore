@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { handleCdnRequest, toSupabaseUrl } from '../worker/image-cdn.js';
+import { CDN_BUCKETS, handleCdnRequest, toSupabaseUrl } from '../worker/image-cdn.js';
 import { isSpaPath } from '../worker/index.js';
 const request = (path='/cdn-storage/product-images/a.webp',opts={}) => new Request('https://www.ozylix.com'+path,opts);
 const writes=[]; const tasks=[];
@@ -7,6 +7,8 @@ globalThis.caches={default:{match:async()=>undefined,put:async(k,r)=>writes.push
 const ctx={waitUntil(p){tasks.push(p);}};
 for(const path of ['/else/product-images/a','/cdn-storage/private/a','/cdn-storage/product-images/../a','/cdn-storage/product-images/%2e%2e/a','/cdn-storage/product-images/a%2fb','/cdn-storage/product-images/%252e%252e/a','/cdn-storage/product-images/%zz']) assert.equal(toSupabaseUrl(path),null,path);
 assert.match(toSupabaseUrl('/cdn-storage/product-images/folder/a%20b.webp'),/folder\/a%20b.webp$/);
+CDN_BUCKETS.add('site-media');
+assert.equal(toSupabaseUrl('/cdn-storage/site-media/home/banner.webp'), 'https://frwsjgrrtzhjfflcdjjs.supabase.co/storage/v1/object/public/site-media/home/banner.webp');
 assert.equal(isSpaPath('/blog/post'),true); assert.equal(isSpaPath('/blogger'),false);
 globalThis.fetch=async()=>{throw Error('must not fetch');};
 assert.equal((await handleCdnRequest(request(undefined,{method:'POST'}),ctx)).status,405);
