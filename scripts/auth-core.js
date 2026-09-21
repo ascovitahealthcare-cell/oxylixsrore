@@ -1561,13 +1561,13 @@ function buildProductPage(p) {
         ${displaySaving > 0 ? `&#x1F389; You save &#x20B9;${displaySaving.toLocaleString('en-IN')} on this pack!` : ''}
       </div>
       ${tiers ? buildTierWidget(p) : (p.offer ? `<div class="prod-offer-line">&#x1F389; ${p.offer}</div>` : '')}
-      <div class="prod-stock">&#x2705; In Stock (${p.stock} units)</div>
+      <div class="prod-stock">${Number(p.stock) <= 0 ? "Out of stock" : "&#x2705; In Stock (" + p.stock + " units)"}</div>
       <p style="font-size:.88rem;color:var(--gray);line-height:1.8;margin-bottom:20px;">${p.description}</p>
       ${!tiers ? `<div class="qty-wrap"><button class="qty-btn" onclick="chQty(-1)">&#x2212;</button><span class="qty-num" id="pQtyDisp">1</span><button class="qty-btn" onclick="chQty(1)">+</button></div>` : ''}
       ${buildKeyStatChips(p)}
-      <button class="add-cart-btn" id="addCartBtn" data-tier="${tierIdx}" onclick="addToCartWithTier(${p.id})">&#x1F6D2; Add to Cart</button>
+      <button class="add-cart-btn" id="addCartBtn" ${Number(p.stock) <= 0 ? "disabled" : ""} data-tier="${tierIdx}" onclick="addToCartWithTier(${p.id})">&#x1F6D2; Add to Cart</button>
       <div class="stock-urgency" id="stockUrgency"></div>
-      <button class="buy-now-btn" onclick="addToCartWithTier(${p.id});showPage('checkout')">&#x26A1; Buy Now</button>
+      <button class="buy-now-btn" ${Number(p.stock) <= 0 ? "disabled" : ""} onclick="addToCartWithTier(${p.id});showPage('checkout')">&#x26A1; Buy Now</button>
       <div id="productMMProgress"></div>
       <div class="prod-features">
         <div class="feat-item"><span class="feat-ico">&#x1F331;</span>100% Organic</div>
@@ -1750,6 +1750,7 @@ window.renderProductMMProgress = function (p) {
 // Adds a tiered product to cart, recording which tier (pack size) was chosen
 function addToCartWithTier(productId) {
   const p0 = PRODUCTS.find(p => p.id === productId);
+  if (!p0 || Number(p0.stock) <= 0) { showToast("This product is out of stock."); return; }
   const tiers = getProductTiers(p0);
   if (!tiers) {
     // No tier system — standard add to cart
@@ -8513,4 +8514,5 @@ function vitaSubmitLead() {
 }
 
 // Vita is initialized via the consolidated showPage above
+
 

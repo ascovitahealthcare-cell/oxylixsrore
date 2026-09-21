@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta charset="UTF-8">
 <style>
 /* Permission-safe customer reminders. No browser permission is requested until the customer presses Allow. */
 #ozylxConsentBar{position:fixed;left:18px;right:18px;bottom:18px;z-index:10050;display:none;max-width:760px;margin:auto;background:var(--dark,#20303a);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.22);padding:14px 16px;font-size:.82rem;line-height:1.5}
@@ -13,7 +14,6 @@
 @media(max-width:600px){#ozylxConsentBar{left:10px;right:10px;bottom:10px}}
 
 </style>
-  <meta charset="UTF-8">
   <!-- ── FORCE HTTPS — must stay the first script in the document ──────
        Symptom this fixes, from the Render log:
 
@@ -203,8 +203,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Ozylix">
   <meta name="mobile-web-app-capable" content="yes">
-  <link rel="alternate" hreflang="en-IN" data-hreflang="self">
-  <link rel="alternate" hreflang="x-default" data-hreflang="self">
+  
+  
   
 
   <!-- Google Search Console verification -->
@@ -217,7 +217,7 @@
   <!-- Preconnect for performance -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preconnect" href="https://i.ibb.co" crossorigin>
+  
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
   <!-- PERF (Aug 2026): the storefront hits the Render API on every page
        load (/api/products, /api/site-media, /api/promo-media) and the
@@ -1030,7 +1030,7 @@
        Empty on purpose. Paste image URLs into BANNER_SLIDES (search for it
        further down this file) and the banner appears; leave it empty and the
        whole section stays hidden, so the page looks finished either way. ══ -->
-  <section class="hero-banner" id="heroBanner" aria-label="Offers" aria-roledescription="carousel">
+  <section class="hero-banner is-live" id="heroBanner" style="aspect-ratio:1600/686" aria-label="Offers" aria-roledescription="carousel">
     <div class="hero-banner-track" id="heroBannerTrack"></div>
     <button class="hero-banner-arrow hero-banner-prev" id="heroBannerPrev" aria-label="Previous offer">&#8249;</button>
     <button class="hero-banner-arrow hero-banner-next" id="heroBannerNext" aria-label="Next offer">&#8250;</button>
@@ -2791,8 +2791,8 @@
 
 
 
-<script defer src="/scripts/store-core.min.js?v=20260914-1"></script>
-<script defer src="/scripts/img-hydrator.js?v=20260821-2"></script>
+<script defer src="/scripts/store-core.min.js?v=20260921-1"></script>
+<script defer src="/scripts/img-hydrator.js?v=20260921-1"></script>
 <script defer src="/scripts/product-images.js?v=20260822-1"></script>
 
 <!-- ══════════ SIDE CART DRAWER ══════════ -->
@@ -3131,7 +3131,7 @@
   </div>
 </footer>
 
-<script defer src="/scripts/auth-core.min.js?v=20260825-2"></script>
+<script defer src="/scripts/auth-core.min.js?v=20260921-1"></script>
 
 <div id="stickyCart" style="position:fixed;bottom:0;left:0;right:0;z-index:920;display:none;align-items:center;gap:12px;padding:10px 14px;transform:translateY(100%);background:var(--paper);box-shadow:0 -1px 0 var(--edge),0 -10px 30px rgba(72,62,70,.10)">
   <div style="flex:1;min-width:0">
