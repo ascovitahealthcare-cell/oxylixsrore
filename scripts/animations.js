@@ -6,6 +6,11 @@
 // Particle system · Scroll progress · Nav shrink
 // ═══════════════════════════════════════════════════════════
 (function() {
+  function onReady(fn) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, { once: true });
+    else fn();
+  }
+
 
   // ── SHARED SCROLL SCHEDULER ──
   // Keep all scroll-linked work behind one requestAnimationFrame. Android
@@ -84,12 +89,12 @@
 
   // ── CART BADGE BUMP ──
   const _origUpdateCartUI = null;
-  document.addEventListener('DOMContentLoaded', function() {
+  onReady(function() {
     const badges = document.querySelectorAll('.cart-badge');
     // Observe cart badge changes
     const cartObs = new MutationObserver(function(mutations) {
       mutations.forEach(function(m) {
-        if (m.target.classList.contains('cart-badge')) {
+        if (m.target.classList && m.target.classList.contains('cart-badge')) {
           m.target.classList.remove('bump');
           void m.target.offsetWidth;
           m.target.classList.add('bump');
@@ -100,17 +105,22 @@
   });
 
   // ── SCROLL REVEAL ENGINE ──
+  let revealObserver;
   function initScrollReveal() {
-    const obs = new IntersectionObserver(function(entries) {
+    if (lowPowerDevice || !('IntersectionObserver' in window)) {
+      document.querySelectorAll('[data-reveal]').forEach(function(el) { el.classList.add('revealed'); });
+      return;
+    }
+    const obs = revealObserver || (revealObserver = new IntersectionObserver(function(entries) {
       entries.forEach(function(entry) {
         if (entry.isIntersecting) {
           entry.target.classList.add('revealed');
           obs.unobserve(entry.target);
         }
       });
-    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }));
 
-    document.querySelectorAll('[data-reveal]').forEach(function(el) {
+    document.querySelectorAll('[data-reveal]:not(.revealed)').forEach(function(el) {
       obs.observe(el);
     });
   }
@@ -193,11 +203,12 @@
     });
 
     initScrollReveal();
+    refreshScrollMetrics();
   }
 
   // ── RE-TAG after dynamic renders ──
   var _origRenderProductCard = null;
-  document.addEventListener('DOMContentLoaded', function() {
+  onReady(function() {
     setTimeout(tagSections, 300);
 
     // Re-init reveal after shop/product grids re-render
@@ -240,10 +251,14 @@
       })(i);
     }
   }
-  spawnParticles();
+  // Avoid global decorative particles during storefront interaction.
 
   // ── COUNTER ANIMATION for hero stats ──
   function animateCounter(el, target, prefix, suffix) {
+    if (lowPowerDevice) {
+      el.textContent = prefix + target.toLocaleString('en-IN') + suffix;
+      return;
+    }
     var start = 0;
     var duration = 1800;
     var step = target / (duration / 16);
@@ -255,7 +270,7 @@
     }, 16);
   }
 
-  document.addEventListener('DOMContentLoaded', function() {
+  onReady(function() {
     // Animate hero stat numbers when visible
     var heroObs = new IntersectionObserver(function(entries) {
       entries.forEach(function(entry) {
@@ -287,7 +302,7 @@
         }
       });
     }, { threshold: 0.5 });
-    document.querySelectorAll('[data-count]:not([data-live-rating])').forEach(function(el) {
+    document.querySelectorAll('[data-count]:not([data-live-rating]):not(.fc-num)').forEach(function(el) {
       counterObs.observe(el);
     });
 
@@ -296,7 +311,7 @@
       if (typeof window.showPage === 'function' && !window._animSPWrapped) {
         window._animSPWrapped = true;
         var _origSP = window.showPage;
-        window.showPage = function(pg) { _origSP(pg); setTimeout(tagSections, 200); };
+        window.showPage = function() { var result = _origSP.apply(this, arguments); setTimeout(tagSections, 200); refreshScrollMetrics(); return result; };
         clearInterval(_spWrapTimer);
       }
     }, 150);
