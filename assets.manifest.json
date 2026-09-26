@@ -1,7 +1,7 @@
 {
   "scripts/admin-api.js": "be018582db9fc2bf",
   "scripts/admin-audit.js": "c0a5c1df6ee1f178",
-  "scripts/admin-core.js": "20b6c9005222855b",
+  "scripts/admin-core.js": "fea0d5585cfb7697",
   "scripts/admin-ui.js": "f671762dc3fdd8e9",
   "scripts/auth-core.js": "f3058f9bb0519b30",
   "scripts/banners.js": "e756ede314c9eb96",

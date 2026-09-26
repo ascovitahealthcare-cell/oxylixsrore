@@ -5606,7 +5606,7 @@ async function loadPhotoLibrary() {
     const d = await r.json();
     // Handle multiple possible response shapes from backend
     const imgs = d.data || d.images || d.files || d.photos || (Array.isArray(d) ? d : []);
-    _mediaLibraryImgs = imgs;
+    _mediaLibraryImgs = (Array.isArray(imgs) ? imgs : []).filter(img => img && imgExt(img.filename));
     _mediaSelected.clear();
     renderPhotoGrid();
   } catch(e) {
@@ -5626,7 +5626,10 @@ const fmtBytes = (b) => {
   if (b < 1048576) return (b / 1024).toFixed(0) + ' KB';
   return (b / 1048576).toFixed(1) + ' MB';
 };
-const imgExt = (fn) => (fn || '').split('.').pop().toLowerCase();
+const imgExt = (fn) => {
+  const match = /\.([a-z0-9]+)$/i.exec(fn || '');
+  return match ? match[1].toLowerCase() : '';
+};
 function setMediaTab(tab, el) {
   _mediaTab = tab;
   document.querySelectorAll('.media-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
@@ -5767,6 +5770,7 @@ async function uploadPhotos(fileList) {
   const bar = document.getElementById('uploadBar');
   const status = document.getElementById('uploadStatus');
   let done = 0;
+  let uploaded = 0;
   for(const rawFile of files) {
     status.textContent = `Uploading ${rawFile.name}… (${done+1}/${files.length})`;
     bar.style.width = Math.round((done/files.length)*90 + 5) + '%';
@@ -5778,13 +5782,14 @@ async function uploadPhotos(fileList) {
       const r = await adminProofUpload('/api/upload/image', fd, 'Authorize this photo-library upload?');
       const d = await r.json();
       if(!r.ok) throw new Error(d.error||'Upload failed');
+      uploaded++;
     } catch(e) { toast(`${rawFile.name}: ${e.message}`, 'error'); }
     done++;
   }
   bar.style.width = '100%';
-  const vids = files.filter(f => f.type.startsWith('video/')).length;
-  status.textContent = `✅ Uploaded ${done}/${files.length} file(s)` + (vids ? ` (${vids} video(s) compressed on the server)` : '');
-  toast('Upload complete ✅');
+  const failed = files.length - uploaded;
+  status.textContent = `${failed ? '⚠️' : '✅'} Uploaded ${uploaded}/${files.length} file(s)` + (failed ? ` — ${failed} failed or cancelled` : '');
+  toast(failed ? `Uploaded ${uploaded}/${files.length}; ${failed} failed or cancelled` : 'Upload complete ✅', failed ? 'error' : 'success');
   setTimeout(() => { document.getElementById('uploadProgress').style.display='none'; bar.style.width='0%'; }, 2000);
   loadPhotoLibrary();
   document.getElementById('photoFileInput').value = '';
@@ -8774,5 +8779,6 @@ async function geminiSend() {
     console.error('Gemini error:', e);
   }
 }
+
 
 
